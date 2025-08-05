@@ -1,5 +1,6 @@
 from playwright.sync_api import sync_playwright
 import time
+import requests
 import datetime
 
 USER_DATA_DIR = "./bdg-session"
@@ -9,8 +10,25 @@ BDG_URL = "https://www.bdgbasketball.com//#/saasLottery/WinGo?gameCode=WinGo_30S
 BET_LEVELS = [1, 2, 4, 9, 18, 37, 76, 155, 311, 625]
 MAX_LOSSES = len(BET_LEVELS)
 
+# === Telegram Setup ===
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Replace with your token
+CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"      # Replace with your chat/user ID
+
+def send_telegram_message(message):
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = {
+            "chat_id": CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        requests.post(url, data=data)
+        print("📩 Telegram alert sent.")
+    except Exception as e:
+        print(f"❌ Failed to send Telegram message: {e}")
+
 def detect_win(page):
-    page.wait_for_selector(".winner_result", timeout=60000)
+    page.wait_for_selector(".winner_result", timeout=40000)
 
     # Extract number and type
     result_number = page.locator(".winner_result div").nth(1).text_content().strip()
@@ -51,6 +69,7 @@ with sync_playwright() as p:
     page = browser.new_page()
     page.goto(BDG_URL)
     print("🌐 Logged in and page loaded.")
+    send_telegram_message("🚀 BDG bot started and is now running.")
 
     loss_count = 0
     round_num = 1
@@ -58,6 +77,7 @@ with sync_playwright() as p:
     while True:
         if loss_count >= MAX_LOSSES:
             print("🛑 Max losses reached. Stopping.")
+            send_telegram_message("🛑 BDG bot stopped after reaching max loss streak.")
             break
 
         current_bet = BET_LEVELS[loss_count]
@@ -83,6 +103,7 @@ with sync_playwright() as p:
 
         except Exception as e:
             print("🚨 Unexpected error:", e)
+            send_telegram_message(f"🚨 BDG bot crashed with error:\n<code>{e}</code>")
             break
 
     browser.close()
