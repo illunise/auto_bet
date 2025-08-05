@@ -28,53 +28,6 @@ def send_telegram_message(message):
     except Exception as e:
         print(f"❌ Failed to send Telegram message: {e}")
 
-def telegram_command_listener(page):
-    def get_updates(offset=None):
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
-        params = {"timeout": 30}
-        if offset:
-            params["offset"] = offset
-        response = requests.get(url, params=params)
-        return response.json().get("result", [])
-
-    last_update_id = None
-    print("📡 Telegram command listener started.")
-
-    while True:
-        try:
-            updates = get_updates(offset=last_update_id)
-            for update in updates:
-                last_update_id = update["update_id"] + 1
-
-                message = update.get("message", {})
-                text = message.get("text", "")
-                chat_id = message.get("chat", {}).get("id")
-
-                if str(chat_id) != CHAT_ID:
-                    continue  # Ignore messages not from you
-
-                if text.lower() == "/balance":
-                    try:
-                        page.reload()
-                        page.wait_for_selector(".Wallet_C-balance-11", timeout=10000)
-                        balance_text = page.locator(".Wallet_C-balance-11 div").nth(0).text_content().strip()
-                        send_telegram_message(f"💰 Current balance: {balance_text}")
-                    except Exception as balance_error:
-                        send_telegram_message(f"❌ Failed to fetch balance:\n<code>{balance_error}</code>")
-
-        except Exception as e:
-            print("❌ Telegram command listener error:", e)
-            send_telegram_message(f"❌ Telegram command listener error:\n<code>{e}</code>")
-            time.sleep(10)
-
-def get_balance(page):
-    try:
-        page.wait_for_selector(".Wallet_C-balance-11 div", timeout=50000)
-        balance_text = page.locator(".Wallet_C-balance-11 div").nth(1).text_content().strip()
-        return balance_text
-    except:
-        return "❌ Unable to fetch balance."
-
 def detect_win(page):
     page.wait_for_selector(".winner_result", timeout=40000)
 
@@ -119,10 +72,6 @@ with sync_playwright() as p:
     print("🌐 Logged in and page loaded.")
     send_telegram_message("🚀 BDG bot started and is now running.")
 
-    # 🧵 Start Telegram command listener thread
-    threading.Thread(target=telegram_command_listener, args=(page,), daemon=True).start()
-
-
     loss_count = 0
     round_num = 1
 
@@ -144,9 +93,25 @@ with sync_playwright() as p:
             if detect_win(page):
                 print("🎉 ✅ WIN! Resetting to base level. Waiting 50s before next round...")
                 loss_count = 0
+
+                # Fetch and print balance
+                try:
+                    page.wait_for_selector(".Wallet_C-balance-11", timeout=10000)
+                    balance_text = page.locator(".Wallet_C-balance-11 div").nth(0).text_content().strip()
+                    print(f"💰 Current balance: {balance_text}")
+                except Exception as e:
+                    print(f"⚠️ Failed to fetch balance: {e}")
             else:
                 print("💀 ❌ LOSS! Moving to next bet level.")
                 loss_count += 1
+
+                # Fetch and print balance
+                try:
+                    page.wait_for_selector(".Wallet_C-balance-11", timeout=10000)
+                    balance_text = page.locator(".Wallet_C-balance-11 div").nth(0).text_content().strip()
+                    print(f"💰 Current balance: {balance_text}")
+                except Exception as e:
+                    print(f"⚠️ Failed to fetch balance: {e}")
 
             time.sleep(5)
 
