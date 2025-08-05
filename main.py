@@ -11,8 +11,8 @@ BET_LEVELS = [1, 2, 4, 9, 18, 37, 76, 155, 311, 625]
 MAX_LOSSES = len(BET_LEVELS)
 
 # === Telegram Setup ===
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Replace with your token
-CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"      # Replace with your chat/user ID
+BOT_TOKEN = "8448605132:AAE5wP99MmTvm6CU55WKURrFhf8mCm83S_U"  # Replace with your token
+CHAT_ID = "7244803677"      # Replace with your chat/user ID
 
 def send_telegram_message(message):
     try:
