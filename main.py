@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright
 import time
 import requests
+import threading
 import datetime
 
 USER_DATA_DIR = "./bdg-session"
@@ -26,6 +27,40 @@ def send_telegram_message(message):
         print("📩 Telegram alert sent.")
     except Exception as e:
         print(f"❌ Failed to send Telegram message: {e}")
+
+def telegram_command_listener(page):
+    offset = None
+    print("📨 Telegram command listener started.")
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+            if offset:
+                url += f"?offset={offset + 1}"
+            response = requests.get(url)
+            updates = response.json()["result"]
+
+            for update in updates:
+                offset = update["update_id"]
+                message = update.get("message", {})
+                text = message.get("text", "")
+                chat_id = message.get("chat", {}).get("id")
+
+                if text.strip().lower() == "/balance" and str(chat_id) == CHAT_ID:
+                    balance = get_balance(page)
+                    send_telegram_message(f"💰 Current Balance: {balance}")
+
+            time.sleep(3)
+        except Exception as e:
+            print("❌ Telegram command listener error:", e)
+            time.sleep(5)
+
+def get_balance(page):
+    try:
+        page.wait_for_selector(".Wallet_C-balance-11 div", timeout=50000)
+        balance_text = page.locator(".Wallet_C-balance-11 div").nth(1).text_content().strip()
+        return balance_text
+    except:
+        return "❌ Unable to fetch balance."
 
 def detect_win(page):
     page.wait_for_selector(".winner_result", timeout=40000)
@@ -70,6 +105,10 @@ with sync_playwright() as p:
     page.goto(BDG_URL)
     print("🌐 Logged in and page loaded.")
     send_telegram_message("🚀 BDG bot started and is now running.")
+
+    # 🧵 Start Telegram command listener thread
+    threading.Thread(target=telegram_command_listener, args=(page,), daemon=True).start()
+
 
     loss_count = 0
     round_num = 1
