@@ -29,30 +29,43 @@ def send_telegram_message(message):
         print(f"❌ Failed to send Telegram message: {e}")
 
 def telegram_command_listener(page):
-    offset = None
-    print("📨 Telegram command listener started.")
+    def get_updates(offset=None):
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+        params = {"timeout": 30}
+        if offset:
+            params["offset"] = offset
+        response = requests.get(url, params=params)
+        return response.json().get("result", [])
+
+    last_update_id = None
+    print("📡 Telegram command listener started.")
+
     while True:
         try:
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
-            if offset:
-                url += f"?offset={offset + 1}"
-            response = requests.get(url)
-            updates = response.json()["result"]
-
+            updates = get_updates(offset=last_update_id)
             for update in updates:
-                offset = update["update_id"]
+                last_update_id = update["update_id"] + 1
+
                 message = update.get("message", {})
                 text = message.get("text", "")
                 chat_id = message.get("chat", {}).get("id")
 
-                if text.strip().lower() == "/balance" and str(chat_id) == CHAT_ID:
-                    balance = get_balance(page)
-                    send_telegram_message(f"💰 Current Balance: {balance}")
+                if str(chat_id) != CHAT_ID:
+                    continue  # Ignore messages not from you
 
-            time.sleep(3)
+                if text.lower() == "/balance":
+                    try:
+                        page.reload()
+                        page.wait_for_selector(".Wallet_C-balance-11", timeout=10000)
+                        balance_text = page.locator(".Wallet_C-balance-11 div").nth(0).text_content().strip()
+                        send_telegram_message(f"💰 Current balance: {balance_text}")
+                    except Exception as balance_error:
+                        send_telegram_message(f"❌ Failed to fetch balance:\n<code>{balance_error}</code>")
+
         except Exception as e:
             print("❌ Telegram command listener error:", e)
-            time.sleep(5)
+            send_telegram_message(f"❌ Telegram command listener error:\n<code>{e}</code>")
+            time.sleep(10)
 
 def get_balance(page):
     try:
